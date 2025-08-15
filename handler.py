@@ -13,6 +13,10 @@ from runpod.serverless.utils.rp_validator import validate
 from runpod.serverless.modules.rp_logger import RunPodLogger
 from requests.adapters import HTTPAdapter, Retry
 from schemas.input import INPUT_SCHEMA
+import boto3
+from botocore.client import Config
+import random
+from urllib.parse import urlparse
 
 
 APP_NAME = 'runpod-worker-comfyui'
@@ -22,7 +26,10 @@ LOG_FILE = 'comfyui-worker.log'
 TIMEOUT = 600
 LOG_LEVEL = 'INFO'
 DISK_MIN_FREE_BYTES = 500 * 1024 * 1024  # 500MB in bytes
-
+S3_ENDPOINT = 'https://f07373fd866c2022dc69c4cd2218aff2.r2.cloudflarestorage.com/'
+S3_ACCESS_KEY = 'a430d35c83ac671918a733ca24d62022'
+S3_SECRET_KEY = '39cdcf3e97184769b5ab280d32d4f5bcaccf36b2181d8b056dfe1ea200eefb65'
+S3_BUCKET = 'hoit-storage'
 
 # ---------------------------------------------------------------------------- #
 #                               Custom Log Handler                             #
@@ -167,48 +174,22 @@ def send_post_request(endpoint, payload):
         timeout=TIMEOUT
     )
 
-
-def get_txt2img_payload(workflow, payload):
-    workflow["3"]["inputs"]["seed"] = payload["seed"]
-    workflow["3"]["inputs"]["steps"] = payload["steps"]
-    workflow["3"]["inputs"]["cfg"] = payload["cfg_scale"]
-    workflow["3"]["inputs"]["sampler_name"] = payload["sampler_name"]
-    workflow["4"]["inputs"]["ckpt_name"] = payload["ckpt_name"]
-    workflow["5"]["inputs"]["batch_size"] = payload["batch_size"]
-    workflow["5"]["inputs"]["width"] = payload["width"]
-    workflow["5"]["inputs"]["height"] = payload["height"]
-    workflow["6"]["inputs"]["text"] = payload["prompt"]
-    workflow["7"]["inputs"]["text"] = payload["negative_prompt"]
-    return workflow
-
-
-def get_img2img_payload(workflow, payload):
-    workflow["13"]["inputs"]["seed"] = payload["seed"]
-    workflow["13"]["inputs"]["steps"] = payload["steps"]
-    workflow["13"]["inputs"]["cfg"] = payload["cfg_scale"]
-    workflow["13"]["inputs"]["sampler_name"] = payload["sampler_name"]
-    workflow["13"]["inputs"]["scheduler"] = payload["scheduler"]
-    workflow["13"]["inputs"]["denoise"] = payload["denoise"]
-    workflow["1"]["inputs"]["ckpt_name"] = payload["ckpt_name"]
-    workflow["2"]["inputs"]["width"] = payload["width"]
-    workflow["2"]["inputs"]["height"] = payload["height"]
-    workflow["2"]["inputs"]["target_width"] = payload["width"]
-    workflow["2"]["inputs"]["target_height"] = payload["height"]
-    workflow["4"]["inputs"]["width"] = payload["width"]
-    workflow["4"]["inputs"]["height"] = payload["height"]
-    workflow["4"]["inputs"]["target_width"] = payload["width"]
-    workflow["4"]["inputs"]["target_height"] = payload["height"]
-    workflow["6"]["inputs"]["text"] = payload["prompt"]
-    workflow["7"]["inputs"]["text"] = payload["negative_prompt"]
+def get_wan_video_payload(workflow, payload):
+    workflow["129"]["inputs"]["prompt"] = payload["positive_prompt"]
+    workflow["27"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
+    workflow["63"]["inputs"]["num_frames"] = payload["num_frames"]
+    workflow["202"]["inputs"]["image"] = payload["image"]
+    workflow["204"]["inputs"]["width"] = payload["width"]
+    workflow["204"]["inputs"]["height"] = payload["height"]
     return workflow
 
 
 def get_workflow_payload(workflow_name, payload):
     with open(f'/workflows/{workflow_name}.json', 'r') as json_file:
         workflow = json.load(json_file)
-
-    if workflow_name == 'txt2img':
-        workflow = get_txt2img_payload(workflow, payload)
+        
+    if workflow_name == "wan_i2v":
+        workflow = get_wan_video_payload(workflow, payload)
 
     return workflow
 
@@ -233,11 +214,14 @@ def create_unique_filename_prefix(payload):
     more than one request completes at the same time, which can either result in the
     incorrect output being returned, or the output image not being found.
     """
-    for key, value in payload.items():
-        class_type = value.get('class_type')
+#    for key, value in payload.items():
+#        class_type = value.get('class_type')
 
-        if class_type == 'SaveImage':
-            payload[key]['inputs']['filename_prefix'] = str(uuid.uuid4())
+#        if class_type == 'VHS_VideoCombine':
+    prefix = str(uuid.uuid4())
+    payload["30"]['inputs']['filename_prefix'] = prefix
+    payload["331"]['inputs']['filename_prefix'] = prefix
+    return prefix
 
 
 # ---------------------------------------------------------------------------- #
@@ -531,6 +515,50 @@ def get_container_disk_info(job_id=None):
 # ---------------------------------------------------------------------------- #
 #                                RunPod Handler                                #
 # ---------------------------------------------------------------------------- #
+def save_to_network_volume(url):
+    """
+    주어진 이미지 URL을 ComfyUI input 디렉토리에 저장합니다.
+    저장된 파일 이름만 반환합니다.
+    """
+    try:
+        save_dir = f"{VOLUME_MOUNT_PATH}/ComfyUI/input"
+
+        parsed = urlparse(url)
+        ext = os.path.splitext(parsed.path)[1] or ".png"
+
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(save_dir, filename)
+
+        response = requests.get(url, stream=True, timeout=10)
+        response.raise_for_status()
+
+        with open(filepath, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"저장 완료: {filepath}")
+        return filename
+
+    except Exception as e:
+        print(f"저장 실패: {e}")
+        return None
+
+
+def upload_to_s3(local_path, filename):
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='auto'  
+    )
+    s3.upload_file(local_path, S3_BUCKET, filename)
+
+    public_url = f"https://image.hoit.ai.kr/{filename}"
+    return public_url
+
+
 def handler(event):
     job_id = event['id']
     os.environ['RUNPOD_JOB_ID'] = job_id
@@ -561,6 +589,8 @@ def handler(event):
         workflow_name = payload['workflow']
         payload = payload['payload']
 
+        payload['image'] = save_to_network_volume(payload['image_url'])
+
         if workflow_name == 'default':
             workflow_name = 'txt2img'
 
@@ -569,11 +599,13 @@ def handler(event):
         if workflow_name != 'custom':
             try:
                 payload = get_workflow_payload(workflow_name, payload)
+                logging.info('[DEBUG] payload after get_workflow_payload:\n' + json.dumps(payload, indent=2), job_id)
             except Exception as e:
                 logging.error(f'Unable to load workflow payload for: {workflow_name}', job_id)
                 raise
 
-        create_unique_filename_prefix(payload)
+        prefix = create_unique_filename_prefix(payload)
+        logging.info('[DEBUG] payload after create_unique_filename_prefix:\n' + json.dumps(payload, indent=2), job_id)
         logging.debug('Queuing prompt', job_id)
 
         queue_response = send_post_request(
@@ -608,25 +640,21 @@ def handler(event):
             if status['status_str'] == 'success' and status['completed']:
                 # Job was processed successfully
                 outputs = resp_json[prompt_id]['outputs']
+                with open(f'{VOLUME_MOUNT_PATH}/ComfyUI/output/outputs_result.txt', "w", encoding="utf-8") as f:
+                        f.write("이것이 결과물:\n")
+                        f.write(str(outputs))
 
                 if len(outputs):
                     logging.info(f'Images generated successfully for prompt: {prompt_id}', job_id)
-                    output_images = get_output_images(outputs)
-                    images = []
+                    filename = f"i2v/{prefix}_00001.mp4"
 
-                    for output_image in output_images:
-                        filename = output_image.get('filename')
+                    image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{prefix}_00001.mp4'
+                    public_url = upload_to_s3(image_path, filename)
 
-                        if output_image['type'] == 'output':
-                            image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{filename}'
-
-                            if os.path.exists(image_path):
-                                with open(image_path, 'rb') as image_file:
-                                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
-                                    images.append(image_data)
-                                    logging.info(f'Deleting output file: {image_path}', job_id)
-                                    os.remove(image_path)
-                        elif output_image['type'] == 'temp':
+                    if os.path.exists(image_path):
+                            logging.info(f'Deleting output file: {image_path}', job_id)
+                            os.remove(image_path)
+                    elif outputs[0]['type'] == 'temp':
                             # First check if the temp image exists in the mounted volume
                             image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/temp/{filename}'
 
@@ -652,7 +680,7 @@ def handler(event):
                                         logging.error(f'Error deleting temp file {image_path}: {e}')
 
                     response = {
-                        'images': images
+                        'images': public_url
                     }
 
                     # Refresh worker if memory is low

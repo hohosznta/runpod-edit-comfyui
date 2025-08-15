@@ -2,3 +2,5 @@ Pillow
 requests
 python-dotenv
 runpod
+boto3
+botocore
