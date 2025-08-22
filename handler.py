@@ -643,7 +643,7 @@ def handler(event):
                     logging.info(f'Images generated successfully for prompt: {prompt_id}', job_id)
                     filename = f"images/{prefix}_00001_.png"
 
-                    image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{prefix}_0000{i}_.png'
+                    image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{prefix}_00001_.png'
                     public_url = upload_to_s3(image_path, filename)
 
                     if os.path.exists(image_path):
