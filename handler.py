@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 
 APP_NAME = 'runpod-worker-comfyui'
 BASE_URI = 'http://127.0.0.1:3000'
-VOLUME_MOUNT_PATH = '/runpod-volume'
+VOLUME_MOUNT_PATH = '/workspace'
 LOG_FILE = 'comfyui-worker.log'
 TIMEOUT = 600
 LOG_LEVEL = 'INFO'
@@ -174,13 +174,14 @@ def send_post_request(endpoint, payload):
         timeout=TIMEOUT
     )
 
-def get_wan_video_payload(workflow, payload):
-    workflow["129"]["inputs"]["prompt"] = payload["positive_prompt"]
-    workflow["27"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
-    workflow["63"]["inputs"]["num_frames"] = payload["num_frames"]
-    workflow["202"]["inputs"]["image"] = payload["image"]
-    workflow["204"]["inputs"]["width"] = payload["width"]
-    workflow["204"]["inputs"]["height"] = payload["height"]
+def get_img2img_payload(workflow, payload):
+    workflow["7"]["inputs"]["prompt"] = payload["negative_prompt"]
+    workflow["75"]["inputs"]["prompt"] = payload["positive_prompt"]
+    workflow["103"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
+    workflow["58"]["inputs"]["width"] = payload["width"]
+    workflow["58"]["inputs"]["height"] = payload["height"]
+    workflow["76"]["inputs"]["image"] = payload["image"]
+
     return workflow
 
 
@@ -188,8 +189,8 @@ def get_workflow_payload(workflow_name, payload):
     with open(f'/workflows/{workflow_name}.json', 'r') as json_file:
         workflow = json.load(json_file)
         
-    if workflow_name == "wan_i2v":
-        workflow = get_wan_video_payload(workflow, payload)
+    if workflow_name == "img2img":
+        workflow = get_img2img_payload(workflow, payload)
 
     return workflow
 
@@ -214,14 +215,14 @@ def create_unique_filename_prefix(payload):
     more than one request completes at the same time, which can either result in the
     incorrect output being returned, or the output image not being found.
     """
-#    for key, value in payload.items():
-#        class_type = value.get('class_type')
+    for key, value in payload.items():
+        class_type = value.get('class_type')
 
-#        if class_type == 'VHS_VideoCombine':
-    prefix = str(uuid.uuid4())
-    payload["30"]['inputs']['filename_prefix'] = prefix
-    payload["331"]['inputs']['filename_prefix'] = prefix
+        if class_type == 'SaveImage':
+            prefix = str(uuid.uuid4())
+            payload[key]['inputs']['filename_prefix'] = prefix
     return prefix
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -592,7 +593,7 @@ def handler(event):
         payload['image'] = save_to_network_volume(payload['image_url'])
 
         if workflow_name == 'default':
-            workflow_name = 'txt2img'
+            workflow_name = 'img2img'
 
         logging.info(f'Workflow: {workflow_name}', job_id)
 
@@ -640,15 +641,12 @@ def handler(event):
             if status['status_str'] == 'success' and status['completed']:
                 # Job was processed successfully
                 outputs = resp_json[prompt_id]['outputs']
-                with open(f'{VOLUME_MOUNT_PATH}/ComfyUI/output/outputs_result.txt', "w", encoding="utf-8") as f:
-                        f.write("이것이 결과물:\n")
-                        f.write(str(outputs))
-
+                
                 if len(outputs):
                     logging.info(f'Images generated successfully for prompt: {prompt_id}', job_id)
-                    filename = f"i2v/{prefix}_00001.mp4"
+                    filename = f"images/{prefix}_00001_.png"
 
-                    image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{prefix}_00001.mp4'
+                    image_path = f'{VOLUME_MOUNT_PATH}/ComfyUI/output/{prefix}_0000{i}_.png'
                     public_url = upload_to_s3(image_path, filename)
 
                     if os.path.exists(image_path):
