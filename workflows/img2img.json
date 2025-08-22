@@ -1,48 +1,32 @@
 {
   "3": {
     "inputs": {
-      "seed": [
-        "103",
-        0
-      ],
-      "steps": 8,
+      "seed": 976480016588017,
+      "steps": 20,
       "cfg": 2.5,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "66",
-        0
-      ],
-      "positive": [
         "75",
         0
       ],
+      "positive": [
+        "76",
+        0
+      ],
       "negative": [
-        "7",
+        "77",
         0
       ],
       "latent_image": [
-        "58",
+        "88",
         0
       ]
     },
     "class_type": "KSampler",
     "_meta": {
       "title": "KSampler"
-    }
-  },
-  "7": {
-    "inputs": {
-      "text": "",
-      "clip": [
-        "38",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
     }
   },
   "8": {
@@ -63,7 +47,7 @@
   },
   "37": {
     "inputs": {
-      "unet_name": "QwenImage\\qwen_image_edit_fp8_e4m3fn.safetensors",
+      "unet_name": "qwen_image_edit_fp8_e4m3fn.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -91,108 +75,7 @@
       "title": "VAE 로드"
     }
   },
-  "58": {
-    "inputs": {
-      "width": 1024,
-      "height": 1024,
-      "batch_size": 1
-    },
-    "class_type": "EmptySD3LatentImage",
-    "_meta": {
-      "title": "빈 잠재 이미지 (SD3)"
-    }
-  },
-  "66": {
-    "inputs": {
-      "shift": 3.1000000000000005,
-      "model": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "ModelSamplingAuraFlow",
-    "_meta": {
-      "title": "모델 샘플링 (AuraFlow)"
-    }
-  },
-  "73": {
-    "inputs": {
-      "lora_name": "QwenImage\\Qwen-Image-Lightning-8steps-V1.1.safetensors",
-      "strength_model": 1,
-      "model": [
-        "37",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "LoRA 로드 (모델 전용)"
-    }
-  },
-  "75": {
-    "inputs": {
-      "prompt": "change motorcycle to Bright yellow Remain all the logos on top.",
-      "clip": [
-        "38",
-        0
-      ],
-      "vae": [
-        "39",
-        0
-      ],
-      "image": [
-        "76",
-        0
-      ]
-    },
-    "class_type": "TextEncodeQwenImageEdit",
-    "_meta": {
-      "title": "TextEncodeQwenImageEdit"
-    }
-  },
-  "76": {
-    "inputs": {
-      "image": "ComfyUI_temp_spnum_00003_.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "이미지 로드"
-    }
-  },
-  "89": {
-    "inputs": {
-      "unet_name": "QwenImage\\qwen_image_fp8_e4m3fn.safetensors",
-      "weight_dtype": "default"
-    },
-    "class_type": "UNETLoader",
-    "_meta": {
-      "title": "확산 모델 로드"
-    }
-  },
-  "103": {
-    "inputs": {
-      "seed": 357364586631999
-    },
-    "class_type": "easy seed",
-    "_meta": {
-      "title": "EasySeed"
-    }
-  },
-  "118": {
-    "inputs": {
-      "purge_cache": true,
-      "purge_models": true,
-      "anything": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "LayerUtility: PurgeVRAM V2",
-    "_meta": {
-      "title": "LayerUtility: Purge VRAM V2"
-    }
-  },
-  "128": {
+  "60": {
     "inputs": {
       "filename_prefix": "ComfyUI",
       "images": [
@@ -203,6 +86,113 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "이미지 저장"
+    }
+  },
+  "66": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "모델 샘플링 (AuraFlow)"
+    }
+  },
+  "75": {
+    "inputs": {
+      "strength": 1,
+      "model": [
+        "66",
+        0
+      ]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "76": {
+    "inputs": {
+      "prompt": "Remove all UI text elements from the image. Keep the feeling that the characters and scene are in water. Also, remove the green UI elements at the bottom.",
+      "clip": [
+        "38",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ],
+      "image": [
+        "93",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEdit",
+    "_meta": {
+      "title": "TextEncodeQwenImageEdit"
+    }
+  },
+  "77": {
+    "inputs": {
+      "prompt": "",
+      "clip": [
+        "38",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ],
+      "image": [
+        "93",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEdit",
+    "_meta": {
+      "title": "TextEncodeQwenImageEdit"
+    }
+  },
+  "78": {
+    "inputs": {
+      "image": "Qwen-Image_00043_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "이미지 로드"
+    }
+  },
+  "88": {
+    "inputs": {
+      "pixels": [
+        "93",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE 인코드"
+    }
+  },
+  "93": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "image": [
+        "78",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "총 픽셀 수에 맞춰 이미지 크기 조정"
     }
   }
 }

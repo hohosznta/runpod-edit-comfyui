@@ -175,12 +175,9 @@ def send_post_request(endpoint, payload):
     )
 
 def get_img2img_payload(workflow, payload):
-    workflow["7"]["inputs"]["prompt"] = payload["negative_prompt"]
-    workflow["75"]["inputs"]["prompt"] = payload["positive_prompt"]
-    workflow["103"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
-    workflow["58"]["inputs"]["width"] = payload["width"]
-    workflow["58"]["inputs"]["height"] = payload["height"]
-    workflow["76"]["inputs"]["image"] = payload["image"]
+    workflow["76"]["inputs"]["prompt"] = payload["positive_prompt"]
+    workflow["3"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
+    workflow["78"]["inputs"]["image"] = payload["image"]
 
     return workflow
 
